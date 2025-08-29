@@ -25,14 +25,13 @@
   .list{background:#f1f5f9;border-radius:12px;padding:8px;margin-top:12px}
   .task{display:flex;align-items:center;gap:10px;background:#fff;border-radius:12px;padding:10px;margin:6px 0;box-shadow:var(--shadow)}
   .drag{cursor:grab;opacity:.8}
-  /* iOS12用：dialog簡易ポリフィルの見た目 */
   dialog{border:none;border-radius:14px;box-shadow:var(--shadow);max-width:560px;width:96%;padding:16px;background:#fff}
-  dialog:not([open]){display:none}
-  dialog[open]{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:1000}
+  dialog:not([open]){display:none} dialog[open]{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:1000}
   .field{display:flex;flex-direction:column;gap:6px;margin:8px 0}
   input,select{min-height:44px;padding:10px 12px;border-radius:10px;border:1px solid #cbd5e1}
   .hint{font-size:13px;color:var(--muted)}
   .badge{position:fixed;right:8px;bottom:8px;font-size:12px;opacity:.6}
+  .timer{font-weight:800}
 </style>
 </head>
 <body>
@@ -53,14 +52,8 @@
       <div class="depart" id="dep_k6">出発 <strong>07:55</strong>（長押しで編集）</div>
     </div>
     <div class="hint">「はじめる」を押すと音声ガイド開始</div>
-    <div class="now"><div style="font-size:24px">🌞</div><div><h3 id="now_k6">起床</h3><div id="meta_k6" class="hint">所要 1分 / タップ</div></div></div>
-    <div class="controls" id="ctrl_k6">
-      <button class="btn ok" data-cmd="done"  data-id="kid_6">できた！</button>
-      <button class="btn ghost" data-cmd="hint" data-id="kid_6">わからない</button>
-      <button class="btn warn" data-cmd="skip" data-id="kid_6">スキップ（親）</button>
-      <button class="btn"      data-cmd="begin" data-id="kid_6">はじめる</button>
-      <button class="btn ghost" data-cmd="add" data-id="kid_6">＋タスク</button>
-    </div>
+    <div class="now"><div style="font-size:24px">🌞</div><div><h3 id="now_k6">起床</h3><div id="meta_k6" class="hint">所要 1分 / タップ</div><div id="tarea_k6" class="hint"></div></div></div>
+    <div class="controls" id="ctrl_k6"></div>
     <div id="next_k6" class="hint" style="margin-top:6px">つぎ：—</div>
     <div id="list_k6" class="list" aria-label="並べ替えリスト"></div>
   </section>
@@ -73,143 +66,145 @@
       <div class="depart" id="dep_k3">出発 <strong>09:00</strong>（長押しで編集）</div>
     </div>
     <div class="hint">「はじめる」を押すと音声ガイド開始</div>
-    <div class="now"><div style="font-size:24px">🌞</div><div><h3 id="now_k3">起床</h3><div id="meta_k3" class="hint">所要 1分 / タップ</div></div></div>
-    <div class="controls" id="ctrl_k3">
-      <button class="btn ok" data-cmd="done"  data-id="kid_3">できた！</button>
-      <button class="btn ghost" data-cmd="hint" data-id="kid_3">わからない</button>
-      <button class="btn warn" data-cmd="skip" data-id="kid_3">スキップ（親）</button>
-      <button class="btn"      data-cmd="begin" data-id="kid_3">はじめる</button>
-      <button class="btn ghost" data-cmd="add" data-id="kid_3">＋タスク</button>
-    </div>
+    <div class="now"><div style="font-size:24px">🌞</div><div><h3 id="now_k3">起床</h3><div id="meta_k3" class="hint">所要 1分 / タップ</div><div id="tarea_k3" class="hint"></div></div></div>
+    <div class="controls" id="ctrl_k3"></div>
     <div id="next_k3" class="hint" style="margin-top:6px">つぎ：—</div>
     <div id="list_k3" class="list" aria-label="並べ替えリスト"></div>
   </section>
 </main>
 
-<!-- 親ダイアログ（iOS12は簡易ポリフィルで表示） -->
-<dialog id="dlgParent">
-  <form method="dialog">
-    <h3>親ダッシュボード</h3>
-    <div class="field">
-      <label>対象プロフィール</label>
-      <select id="selProfile"><option value="kid_6">6歳</option><option value="kid_3">3歳</option></select>
-    </div>
-    <div class="field"><label>出発時刻（今日だけ）</label><input id="overrideTime" placeholder="例 07:55"></div>
-    <div class="field"><label>学年（0=未就学, 1〜6）</label><input id="gradeInput" type="number" min="0" max="6" step="1" value="1"></div>
-    <div class="field"><label>親PIN（空なら無効）</label><input id="pinInput" inputmode="numeric" maxlength="4" placeholder="1234"></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
-      <button id="btnExport" class="btn ghost" type="button">エクスポート</button>
-      <input id="fileImport" type="file" accept="application/json">
-      <button class="btn" type="button" id="btnCloseParent">とじる</button>
-    </div>
-  </form>
-</dialog>
+<!-- 親ダイアログ -->
+<dialog id="dlgParent"><form method="dialog">
+  <h3>親ダッシュボード</h3>
+  <div class="field"><label>対象プロフィール</label><select id="selProfile"><option value="kid_6">6歳</option><option value="kid_3">3歳</option></select></div>
+  <div class="field"><label>出発時刻（今日だけ）</label><input id="overrideTime" placeholder="例 07:55"></div>
+  <div class="field"><label>学年（0=未就学, 1〜6）</label><input id="gradeInput" type="number" min="0" max="6" step="1" value="1"></div>
+  <div class="field"><label>親PIN（空なら無効）</label><input id="pinInput" inputmode="numeric" maxlength="4" placeholder="1234"></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+    <button id="btnExport" class="btn ghost" type="button">エクスポート</button>
+    <input id="fileImport" type="file" accept="application/json">
+    <button class="btn" type="button" id="btnCloseParent">とじる</button>
+  </div>
+</form></dialog>
 
 <!-- タスク追加/編集 -->
-<dialog id="dlgTask">
-  <form method="dialog">
-    <h3>タスク追加/編集</h3>
-    <div class="field"><label>名前（必須）</label><input id="taskName"></div>
-    <div class="field"><label>所要分（0.5〜30）</label><input id="taskMin" type="number" step="0.5" min="0.5" max="30" value="1"></div>
-    <div class="field"><label>方式</label><select id="taskMode"><option value="tap">タップ</option><option value="timer">タイマー</option></select></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
-      <button id="btnDelTask" class="btn danger" type="button">削除</button>
-      <button id="btnSaveTask" class="btn ok" type="button">保存</button>
-      <button class="btn" type="button" id="btnCloseTask">とじる</button>
-    </div>
-  </form>
-</dialog>
+<dialog id="dlgTask"><form method="dialog">
+  <h3>タスク追加/編集</h3>
+  <div class="field"><label>名前（必須）</label><input id="taskName"></div>
+  <div class="field"><label>所要分（0.5〜30）</label><input id="taskMin" type="number" step="0.5" min="0.5" max="30" value="1"></div>
+  <div class="field"><label>方式</label><select id="taskMode"><option value="tap">タップ</option><option value="timer">タイマー</option></select></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+    <button id="btnDelTask" class="btn danger" type="button">削除</button>
+    <button id="btnSaveTask" class="btn ok" type="button">保存</button>
+    <button class="btn" type="button" id="btnCloseTask">とじる</button>
+  </div>
+</form></dialog>
 
-<div class="badge">build: simple-1file-r5-ios12</div>
+<div class="badge">build: simple-1file-r6-ios12</div>
 
 <script type="module">
-/* ===== iOS12向けユーティリティ/ポリフィル ===== */
-function deepCopy(obj){ try{return JSON.parse(JSON.stringify(obj))}catch(e){return {}}; }
-function _matches(el,sel){
-  var fn = el.matches || el.webkitMatchesSelector || el.msMatchesSelector;
-  return fn ? fn.call(el,sel) : false;
-}
-function closestEl(el,sel){ while(el && el.nodeType===1){ if(_matches(el,sel)) return el; el=el.parentElement; } return null; }
-(function polyfillDialog(){
-  var ds=document.querySelectorAll('dialog');
-  for(var i=0;i<ds.length;i++){
-    var d=ds[i];
-    if(!d.showModal){ d.showModal=function(){ this.setAttribute('open',''); }; d.close=function(){ this.removeAttribute('open'); }; }
-  }
-})();
+/* ==== 互換ユーティリティ ==== */
+function deepCopy(o){try{return JSON.parse(JSON.stringify(o))}catch(e){return {}}}
+function _matches(el,sel){var fn=el.matches||el.webkitMatchesSelector||el.msMatchesSelector;return fn?fn.call(el,sel):false}
+function closestEl(el,sel){while(el&&el.nodeType===1){if(_matches(el,sel))return el;el=el.parentElement}return null}
+(function(){var ds=document.querySelectorAll('dialog');for(var i=0;i<ds.length;i++){var d=ds[i];if(!d.showModal){d.showModal=function(){this.setAttribute('open','')};d.close=function(){this.removeAttribute('open')}}}})();
 
-/* ===== 1) データ ===== */
+/* ==== 1) データ ==== */
 var KEY='mc.simple.v1';
-var defaultState={
-  profiles:{
-    kid_6:{name:'6歳',age:6,schoolGrade:1,targetDeparture:'07:55',todayOverride:null,stars:0,tasks:[
-      {id:'wake',label:'起床',minutes:1,mode:'tap'},{id:'toilet',label:'トイレ',minutes:3,mode:'timer'},
-      {id:'wash',label:'顔を洗う',minutes:2,mode:'tap'},{id:'tooth',label:'歯みがき',minutes:2,mode:'timer'},
-      {id:'dress',label:'着替え',minutes:3,mode:'tap'},{id:'bag',label:'持ち物チェック',minutes:2,mode:'tap'},
-      {id:'rice',label:'朝ごはん',minutes:10,mode:'timer'},{id:'clean',label:'片付け',minutes:2,mode:'tap'},
-      {id:'run',label:'出発準備',minutes:1,mode:'tap'},
-    ]},
-    kid_3:{name:'3歳',age:3,schoolGrade:0,targetDeparture:'09:00',todayOverride:null,stars:0,tasks:[
-      {id:'wake',label:'起床',minutes:1,mode:'tap'},{id:'toilet_assist',label:'トイレ（補助）',minutes:4,mode:'timer'},
-      {id:'wipe_face',label:'顔を拭く',minutes:2,mode:'tap'},{id:'tooth',label:'歯みがき（補助）',minutes:2,mode:'timer'},
-      {id:'dress',label:'着替え',minutes:3,mode:'tap'},{id:'socks',label:'靴下',minutes:1,mode:'tap'},
-      {id:'rice',label:'朝ごはん',minutes:12,mode:'timer'},{id:'clean',label:'片付け',minutes:2,mode:'tap'},
-      {id:'run',label:'出発準備',minutes:1,mode:'tap'},
-    ]},
-  },
-  settings:{pin:'',ttsRate:1.0}
-};
-function load(){ try{var r=localStorage.getItem(KEY); return r? JSON.parse(r):deepCopy(defaultState);}catch(e){return deepCopy(defaultState)} }
-var state=load();
-function save(){ localStorage.setItem(KEY, JSON.stringify(state)); }
+var defaultState={profiles:{
+  kid_6:{name:'6歳',age:6,schoolGrade:1,targetDeparture:'07:55',todayOverride:null,stars:0,timer:null,tasks:[
+    {id:'wake',label:'起床',minutes:1,mode:'tap'},{id:'toilet',label:'トイレ',minutes:3,mode:'timer'},
+    {id:'wash',label:'顔を洗う',minutes:2,mode:'tap'},{id:'tooth',label:'歯みがき',minutes:2,mode:'timer'},
+    {id:'dress',label:'着替え',minutes:3,mode:'tap'},{id:'bag',label:'持ち物チェック',minutes:2,mode:'tap'},
+    {id:'rice',label:'朝ごはん',minutes:10,mode:'timer'},{id:'clean',label:'片付け',minutes:2,mode:'tap'},
+    {id:'run',label:'出発準備',minutes:1,mode:'tap'}]},
+  kid_3:{name:'3歳',age:3,schoolGrade:0,targetDeparture:'09:00',todayOverride:null,stars:0,timer:null,tasks:[
+    {id:'wake',label:'起床',minutes:1,mode:'tap'},{id:'toilet_assist',label:'トイレ（補助）',minutes:4,mode:'timer'},
+    {id:'wipe_face',label:'顔を拭く',minutes:2,mode:'tap'},{id:'tooth',label:'歯みがき（補助）',minutes:2,mode:'timer'},
+    {id:'dress',label:'着替え',minutes:3,mode:'tap'},{id:'socks',label:'靴下',minutes:1,mode:'tap'},
+    {id:'rice',label:'朝ごはん',minutes:12,mode:'timer'},{id:'clean',label:'片付け',minutes:2,mode:'tap'},
+    {id:'run',label:'出発準備',minutes:1,mode:'tap'}]}},
+  settings:{pin:'',ttsRate:1.0}};
+function load(){try{var r=localStorage.getItem(KEY);return r?JSON.parse(r):deepCopy(defaultState)}catch(e){return deepCopy(defaultState)}}
+var state=load(); function save(){localStorage.setItem(KEY,JSON.stringify(state))}
 
-/* ===== 2) 学年未満はかなにする ===== */
+/* ==== 2) 学年かな変換 ==== */
 var KANJI_GRADE={'朝':2,'歳':99,'小':1,'学':1,'生':1,'遅':99,'分':2,'起':3,'床':99,'所':3,'要':4,'時':2,'間':2,'同':2,'顔':2,'洗':6,'歯':3,'着':3,'替':99,'持':3,'物':3,'片':6,'付':4,'出':1,'発':3,'準':5,'備':5};
 var PHRASE={'出発準備':'でかけるじゅんび','起床':'おきる','同時':'いっしょ','所要':'じかん','遅れ':'おくれ','着替え':'きがえ','持ち物':'もちもの','片付け':'かたづけ','朝':'あさ','時間':'じかん','洗う':'あらう','顔':'かお','歯':'は','小学生':'しょうがくせい','気分':'きぶん'};
 var CHAR={'朝':'あさ','歳':'さい','遅':'おく','分':'ふん','起':'お','床':'ゆか','所':'ところ','要':'よう','時':'じ','間':'ま','同':'おなじ','顔':'かお','洗':'あら','歯':'は','着':'き','替':'か','持':'も','物':'もの','片':'かた','付':'つ','出':'で','発':'はつ','準':'じゅん','備':'び'};
-function isKanji(ch){ return /[\u4E00-\u9FFF]/.test(ch); }
-function kgrade(ch){ return KANJI_GRADE[ch]!=null? KANJI_GRADE[ch]:99; }
+function isKanji(c){return /[\u4E00-\u9FFF]/.test(c)} function kgrade(c){return KANJI_GRADE[c]!=null?KANJI_GRADE[c]:99}
 function toKanaByGrade(text,grade){
-  var out=text;
-  for(var p in PHRASE){ if(out.indexOf(p)>=0){
-    var tooHard=false; for(var i=0;i<p.length;i++){ var c=p.charAt(i); if(isKanji(c)&&kgrade(c)>grade){tooHard=true;break;} }
-    if(tooHard||grade===0) out=out.split(p).join(PHRASE[p]);
-  }}
-  var rs=''; for(var j=0;j<out.length;j++){ var ch=out.charAt(j); rs += (isKanji(ch)&&(kgrade(ch)>grade||grade===0)) ? (CHAR[ch]||ch) : ch; }
-  return rs;
+  var out=text; for(var p in PHRASE){if(out.indexOf(p)>=0){var hard=false;for(var i=0;i<p.length;i++){var ch=p.charAt(i);if(isKanji(ch)&&kgrade(ch)>grade){hard=true;break}} if(hard||grade===0) out=out.split(p).join(PHRASE[p])}}
+  var rs=''; for(var j=0;j<out.length;j++){var ch=out.charAt(j); rs += (isKanji(ch)&&(kgrade(ch)>grade||grade===0))?(CHAR[ch]||ch):ch}
+  return rs
 }
 
-/* ===== 3) ユーティリティ ===== */
-function qs(s,root){ return (root||document).querySelector(s); }
-function hhmmToMin(s){ var a=s.split(':'); return (parseInt(a[0],10)||0)*60+(parseInt(a[1],10)||0); }
-function nowMinTokyo(){ var s=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date()); var a=s.split(':'); return (parseInt(a[0],10)||0)*60+(parseInt(a[1],10)||0); }
+/* ==== 3) 時刻/共通 ==== */
+function qs(s,root){return (root||document).querySelector(s)}
+function hhmmToMin(s){var a=s.split(':');return (parseInt(a[0],10)||0)*60+(parseInt(a[1],10)||0)}
+function nowMinTokyo(){var s=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());var a=s.split(':');return (parseInt(a[0],10)||0)*60+(parseInt(a[1],10)||0)}
+function mmss(sec){sec=Math.max(0,Math.round(sec));var m=Math.floor(sec/60),s=sec%60;return ('0'+m).slice(-2)+':'+('0'+s).slice(-2)}
 
-/* ===== 4) 音声（TTS） ===== */
-var vJA=null; function pickVoice(){ var vs=speechSynthesis.getVoices(); vJA=(vs||[]).find(function(v){return /ja-JP/i.test(v.lang)})||(vs||[]).find(function(v){return /ja/i.test(v.lang)})||null; }
-speechSynthesis.addEventListener('voiceschanged', pickVoice); pickVoice();
-function speak(t){ var u=new SpeechSynthesisUtterance(t); if(vJA)u.voice=vJA; u.lang='ja-JP'; u.rate=state.settings.ttsRate; try{speechSynthesis.cancel()}catch(e){} speechSynthesis.speak(u); }
-function speakSeq(parts){
-  try{ speechSynthesis.cancel(); }catch(e){}
-  var i=0; (function play(){ if(i>=parts.length) return; var seg=parts[i++]; var u=new SpeechSynthesisUtterance(seg.text); if(vJA)u.voice=vJA; u.lang='ja-JP'; u.rate=seg.rate!=null?seg.rate:state.settings.ttsRate; u.pitch=seg.pitch!=null?seg.pitch:1.0; speechSynthesis.speak(u); u.onend=play; })();
+/* ==== 4) TTS ==== */
+var vJA=null; function pickVoice(){var vs=speechSynthesis.getVoices(); vJA=(vs||[]).find(function(v){return /ja-JP/i.test(v.lang)})||(vs||[]).find(function(v){return /ja/i.test(v.lang)})||null}
+speechSynthesis.addEventListener('voiceschanged',pickVoice); pickVoice();
+function speak(t){var u=new SpeechSynthesisUtterance(t); if(vJA)u.voice=vJA; u.lang='ja-JP'; u.rate=state.settings.ttsRate; try{speechSynthesis.cancel()}catch(e){} speechSynthesis.speak(u)}
+function speakSeq(parts){try{speechSynthesis.cancel()}catch(e){} var i=0;(function play(){if(i>=parts.length)return;var seg=parts[i++];var u=new SpeechSynthesisUtterance(seg.text); if(vJA)u.voice=vJA; u.lang='ja-JP'; u.rate=seg.rate!=null?seg.rate:state.settings.ttsRate; u.pitch=seg.pitch!=null?seg.pitch:1.0; speechSynthesis.speak(u); u.onend=play})()}
+
+/* ==== 5) タイマー管理 ==== */
+function ensureTimer(p){
+  var t=p.tasks[0]; if(!t||t.mode!=='timer'){p.timer=null; return null}
+  if(!p.timer || p.timer.taskId!==t.id){ p.timer={taskId:t.id,remain:Math.round((t.minutes||1)*60),running:false,last:Date.now()} }
+  return p.timer
 }
+function startTimer(p){var tm=ensureTimer(p); if(!tm)return; tm.running=true; tm.last=Date.now()}
+function pauseTimer(p){if(p.timer)p.timer.running=false}
+function resetTimer(p){if(p.timer){var t=p.tasks[0]; p.timer.remain=Math.round((t.minutes||1)*60); p.timer.running=false}}
+function tickTimer(p,id){ if(!p.timer||!p.timer.running) return false; var now=Date.now(); var dt=(now-p.timer.last)/1000; if(dt<=0) {p.timer.last=now; return false} p.timer.last=now; p.timer.remain-=dt; if(p.timer.remain<=0){p.timer.remain=0;p.timer.running=false; // 自動完了
+    completeTask(id,true); return true } return false }
 
-/* ===== 5) 描画 ===== */
-function prof(id){ return state.profiles[id]; }
-function depTime(p){ return p.todayOverride || p.targetDeparture; }
-function remainMin(p){ return hhmmToMin(depTime(p)) - nowMinTokyo(); }
+/* ==== 6) 画面描画 ==== */
+function prof(id){return state.profiles[id]} function depTime(p){return p.todayOverride||p.targetDeparture}
+function remainMin(p){return hhmmToMin(depTime(p))-nowMinTokyo()}
 
 function renderOne(id){
-  var p=prof(id); var g=p.schoolGrade;
+  var p=prof(id), g=p.schoolGrade, nowTask=p.tasks[0]||null;
   qs(id==='kid_6'?'#h6':'#h3').textContent = p.age<=3 ? '3さい（ほいくえん）' : '6さい（しょうがくせい）';
-  var depLbl = toKanaByGrade('出発',g).replace('出発','でるじかん');
+  var depLbl=toKanaByGrade('出発',g).replace('出発','でるじかん');
   qs(id==='kid_6'?'#dep_k6':'#dep_k3').innerHTML = depLbl+' <strong>'+depTime(p)+'</strong>（長押しで編集）';
   var r=remainMin(p); qs(id==='kid_6'?'#rem_k6':'#rem_k3').textContent = r>=0? (('0'+Math.floor(r/60)).slice(-2)+':'+('0'+(r%60)).slice(-2)) : toKanaByGrade('遅れ '+Math.abs(r)+'分', g);
-  var now = p.tasks[0];
-  qs(id==='kid_6'?'#now_k6':'#now_k3').textContent = now? toKanaByGrade(now.label,g): toKanaByGrade('すべて完了！',g);
-  qs(id==='kid_6'?'#meta_k6':'#meta_k3').textContent = now? toKanaByGrade('所要 '+now.minutes+'分 / '+(now.mode==='timer'?'タイマー':'タップ'), g):'';
+  qs(id==='kid_6'?'#now_k6':'#now_k3').textContent = nowTask? toKanaByGrade(nowTask.label,g): toKanaByGrade('すべて完了！',g);
+  qs(id==='kid_6'?'#meta_k6':'#meta_k3').textContent = nowTask? toKanaByGrade('所要 '+nowTask.minutes+'分 / '+(nowTask.mode==='timer'?'タイマー':'タップ'), g):'';
+  qs(id==='kid_6'?'#stars_k6':'#stars_k3').textContent='⭐'+(p.stars||0);
   qs(id==='kid_6'?'#next_k6':'#next_k3').textContent = p.tasks[1]? toKanaByGrade('つぎ：「'+p.tasks[1].label+'」 / '+p.tasks[1].minutes+'分', g) : 'つぎ：—';
-  qs(id==='kid_6'?'#stars_k6':'#stars_k3').textContent = '⭐'+(p.stars||0);
 
+  // コントロール（タスク種別で切替）
+  var ctrl=qs(id==='kid_6'?'#ctrl_k6':'#ctrl_k3'); var tarea=qs(id==='kid_6'?'#tarea_k6':'#tarea_k3');
+  var html='';
+  if(nowTask){
+    if(nowTask.mode==='timer'){
+      var tm=ensureTimer(p); var remain = tm? mmss(tm.remain):mmss(Math.round(nowTask.minutes*60));
+      tarea.innerHTML = '<span class="timer">のこり '+remain+'</span>';
+      html += '<button class="btn ok" data-cmd="timer_start" data-id="'+id+'">開始</button>';
+      html += '<button class="btn ghost" data-cmd="timer_pause" data-id="'+id+'">一時停止</button>';
+      html += '<button class="btn warn" data-cmd="done" data-id="'+id+'">できた！</button>';
+      html += '<button class="btn" data-cmd="begin" data-id="'+id+'">はじめる</button>';
+      html += '<button class="btn ghost" data-cmd="add" data-id="'+id+'">＋タスク</button>';
+    }else{
+      tarea.innerHTML='';
+      html += '<button class="btn ok" data-cmd="done" data-id="'+id+'">できた！</button>';
+      html += '<button class="btn ghost" data-cmd="hint" data-id="'+id+'">わからない</button>';
+      html += '<button class="btn warn" data-cmd="skip" data-id="'+id+'">スキップ（親）</button>';
+      html += '<button class="btn" data-cmd="begin" data-id="'+id+'">はじめる</button>';
+      html += '<button class="btn ghost" data-cmd="add" data-id="'+id+'">＋タスク</button>';
+    }
+  }else{
+    tarea.innerHTML='';
+    html += '<button class="btn" data-cmd="begin" data-id="'+id+'">はじめる</button>';
+  }
+  ctrl.innerHTML = html;
+
+  // 並べ替えリスト
   var list=qs(id==='kid_6'?'#list_k6':'#list_k3'); list.innerHTML='';
   p.tasks.forEach(function(t,idx){
     var el=document.createElement('div'); el.className='task'; el.draggable=true; el.setAttribute('data-index',idx);
@@ -224,117 +219,87 @@ function renderOne(id){
     list.appendChild(el);
   });
 
-  // DnD（PC向け）
+  // PC DnD
   var dragIdx=null;
-  list.ondragstart=function(e){ var box=closestEl(e.target,'.task'); dragIdx=box?Number(box.getAttribute('data-index')):null; };
-  list.ondragover=function(e){ e.preventDefault(); };
-  list.ondrop=function(e){
-    e.preventDefault(); var target=closestEl(e.target,'.task'); if(!target) return;
-    var dropIdx=Number(target.getAttribute('data-index')); if(dropIdx===dragIdx||dragIdx==null) return;
-    var arr=p.tasks; var m=arr.splice(dragIdx,1)[0]; arr.splice(dropIdx,0,m); save(); renderOne(id);
-  };
+  list.ondragstart=function(e){var box=closestEl(e.target,'.task');dragIdx=box?Number(box.getAttribute('data-index')):null};
+  list.ondragover=function(e){e.preventDefault()};
+  list.ondrop=function(e){e.preventDefault();var target=closestEl(e.target,'.task');if(!target)return;var dropIdx=Number(target.getAttribute('data-index'));if(dropIdx===dragIdx||dragIdx==null)return;var arr=p.tasks;var m=arr.splice(dragIdx,1)[0];arr.splice(dropIdx,0,m);save();renderOne(id)};
 
-  // タップで編集／▲▼で並べ替え
+  // タップ操作（編集／▲▼）
   list.onclick=function(e){
     var mv=closestEl(e.target,'button[data-move]'); 
-    if(mv){
-      var dir=mv.getAttribute('data-move'), idx=Number(mv.getAttribute('data-idx')); 
-      var arr=p.tasks, to=dir==='up'? idx-1:idx+1;
-      if(to>=0 && to<arr.length){ var tmp=arr[idx]; arr.splice(idx,1); arr.splice(to,0,tmp); save(); renderOne(id); }
-      return;
-    }
-    var b=closestEl(e.target,'button[data-edit]'); if(!b) return;
-    openTaskEditor(id, Number(b.getAttribute('data-edit')));
+    if(mv){var dir=mv.getAttribute('data-move'),idx=Number(mv.getAttribute('data-idx'));var arr=p.tasks,to=dir==='up'?idx-1:idx+1;if(to>=0&&to<arr.length){var tmp=arr[idx];arr.splice(idx,1);arr.splice(to,0,tmp);save();renderOne(id)}return}
+    var b=closestEl(e.target,'button[data-edit]'); if(!b)return; openTaskEditor(id, Number(b.getAttribute('data-edit')));
   };
 }
 
-function tick(){ ['kid_6','kid_3'].forEach(renderOne); }
-setInterval(tick,1000); tick();
+function renderAll(){renderOne('kid_6');renderOne('kid_3')}
 
-/* ===== 6) クリック操作 ===== */
-document.body.addEventListener('click',function(e){
-  var btn=closestEl(e.target,'button'); if(!btn) return;
+/* ==== 7) 入力（クリック＋タッチ補強） ==== */
+var lastAct=0;
+function handleButton(btn){
+  var now=Date.now(); if(now-lastAct<250) return; lastAct=now;
   var cmd=btn.getAttribute('data-cmd'), id=btn.getAttribute('data-id');
   if(cmd==='begin'){
-    var g=prof(id).schoolGrade;
-    try{ speechSynthesis.speak(new SpeechSynthesisUtterance(' ')); }catch(ex){} // iOS12: 無音で起こす
-    var say=[
-      { text: toKanaByGrade('おはよう！', g), rate:1.05, pitch:1.2 },
-      { text: toKanaByGrade('きょうの きぶんは、', g) },
-      { text: toKanaByGrade('わくわく、', g) },
-      { text: toKanaByGrade('ねむい、', g) },
-      { text: toKanaByGrade('ふつう、', g) },
-      { text: toKanaByGrade('から えらんでね！', g), pitch:1.15 }
-    ];
-    speakSeq(say);
+    var g=prof(id).schoolGrade; try{speechSynthesis.speak(new SpeechSynthesisUtterance(' '))}catch(ex){} 
+    var say=[{text:toKanaByGrade('おはよう！',g),rate:1.05,pitch:1.2},{text:toKanaByGrade('きょうの きぶんは、',g)},{text:toKanaByGrade('わくわく、',g)},{text:toKanaByGrade('ねむい、',g)},{text:toKanaByGrade('ふつう、',g)},{text:toKanaByGrade('から えらんでね！',g),pitch:1.15}]; speakSeq(say)
   }
-  if(cmd==='done'){
-    var p=prof(id); if(!p.tasks.length) return; var t=p.tasks.shift();
-    p.stars=(p.stars||0)+1; save(); renderOne(id);
-    var g2=p.schoolGrade, nextLabel=p.tasks[0]?p.tasks[0].label:'おしまい';
-    speak(toKanaByGrade('「'+t.label+'」できた！つぎは「'+nextLabel+'」だよ。', g2));
-  }
-  if(cmd==='hint'){
-    var p2=prof(id); var g3=p2.schoolGrade; var t2=p2.tasks[0];
-    speak(toKanaByGrade(t2? (t2.label+' のヒントだよ。ゆっくりでだいじょうぶ！') : 'いっしょに すすもう！', g3));
-  }
-  if(cmd==='skip'){
-    var pin=state.settings.pin; if(pin){ var x=prompt('親PINを入力'); if(x!==pin) return alert('PINが違います'); }
-    var p3=prof(id); if(!p3.tasks.length) return; p3.tasks.shift(); save(); renderOne(id);
-  }
-  if(cmd==='add'){ openTaskEditor(id,-1); }
-});
+  if(cmd==='timer_start'){ startTimer(prof(id)); }
+  if(cmd==='timer_pause'){ pauseTimer(prof(id)); }
+  if(cmd==='done'){ completeTask(id,false); }
+  if(cmd==='hint'){ var p2=prof(id),g3=p2.schoolGrade,t2=p2.tasks[0]; speak(toKanaByGrade(t2? (t2.label+' のヒントだよ。ゆっくりでだいじょうぶ！'):'いっしょに すすもう！',g3)) }
+  if(cmd==='skip'){ var pin=state.settings.pin;if(pin){var x=prompt('親PINを入力');if(x!==pin)return alert('PINが違います')} var p=prof(id); if(!p.tasks.length)return; p.tasks.shift(); p.timer=null; save(); renderOne(id) }
+  if(cmd==='add'){ openTaskEditor(id,-1) }
+  renderOne(id)
+}
+document.body.addEventListener('click',function(e){var b=closestEl(e.target,'button'); if(b) handleButton(b)},false);
+document.body.addEventListener('touchend',function(e){var b=closestEl(e.target,'button'); if(b){e.preventDefault(); handleButton(b)}},false);
 
-/* ===== 7) 出発時刻（長押し編集） ===== */
-[['#dep_k6','kid_6'],['#dep_k3','kid_3']].forEach(function(pair){
-  var sel=pair[0], id=pair[1]; var el=qs(sel); var t=null;
-  el.addEventListener('mousedown',function(){ t=setTimeout(function(){ editTime(id); },500); });
-  el.addEventListener('mouseup',function(){ clearTimeout(t); });
-  el.addEventListener('touchstart',function(){ t=setTimeout(function(){ editTime(id); },500); },{passive:true});
-  el.addEventListener('touchend',function(){ clearTimeout(t); });
-});
-function editTime(id){
-  var v=prompt('出発時刻（HH:MM）', depTime(prof(id)));
-  if(!v) return; if(!/^\d{2}:\d{2}$/.test(v)) return alert('HH:MM 形式');
-  prof(id).todayOverride=v; save(); renderOne(id);
+/* ==== 8) 完了処理 ==== */
+function completeTask(id,auto){
+  var p=prof(id); if(!p.tasks.length) return; var t=p.tasks.shift(); p.stars=(p.stars||0)+1; p.timer=null; save(); renderOne(id);
+  if(!auto){var g=p.schoolGrade; var next=p.tasks[0]?p.tasks[0].label:'おしまい'; speak(toKanaByGrade('「'+t.label+'」できた！つぎは「'+next+'」だよ。',g))}
 }
 
-/* ===== 8) 親ダッシュボード & タスク編集 ===== */
-var dlgParent=qs('#dlgParent'), dlgTask=qs('#dlgTask');
-qs('#btnParent').onclick=function(){ dlgParent.showModal(); };
-qs('#btnCloseParent').onclick=function(){ dlgParent.close(); };
-qs('#selProfile').onchange=function(){ var id=this.value; var p=prof(id); qs('#gradeInput').value=String(p.schoolGrade||0); qs('#overrideTime').value=p.todayOverride||''; };
-qs('#gradeInput').onchange=function(){ var id=qs('#selProfile').value; var v=Number(this.value||'0'); if(v<0||v>6) return alert('0〜6'); prof(id).schoolGrade=v; save(); renderOne(id); };
-qs('#overrideTime').onchange=function(){ var id=qs('#selProfile').value; var v=this.value.trim(); prof(id).todayOverride=v||null; save(); renderOne(id); };
-qs('#pinInput').onchange=function(){ state.settings.pin=this.value.trim(); save(); };
+/* ==== 9) 出発時刻（長押し編集） ==== */
+[['#dep_k6','kid_6'],['#dep_k3','kid_3']].forEach(function(pair){
+  var sel=pair[0], id=pair[1]; var el=qs(sel); var t=null;
+  el.addEventListener('mousedown',function(){t=setTimeout(function(){editTime(id)},500)});
+  el.addEventListener('mouseup',function(){clearTimeout(t)});
+  el.addEventListener('touchstart',function(){t=setTimeout(function(){editTime(id)},500)},{passive:true});
+  el.addEventListener('touchend',function(){clearTimeout(t)});
+});
+function editTime(id){var v=prompt('出発時刻（HH:MM）', depTime(prof(id))); if(!v)return; if(!/^\d{2}:\d{2}$/.test(v))return alert('HH:MM 形式'); prof(id).todayOverride=v; save(); renderOne(id)}
 
-qs('#btnExport').onclick=function(){ var blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='morningCoach_backup.json'; a.click(); };
-qs('#fileImport').onchange=function(e){ var f=e && e.target && e.target.files && e.target.files[0]; if(!f) return; f.text().then(function(txt){ try{ state=JSON.parse(txt); save(); location.reload(); }catch(err){ alert('JSON形式エラー'); } }); };
-qs('#btnCloseTask').onclick=function(){ dlgTask.close(); };
+/* ==== 10) 親ダッシュボード & タスク編集 ==== */
+var dlgParent=qs('#dlgParent'), dlgTask=qs('#dlgTask');
+qs('#btnParent').onclick=function(){dlgParent.showModal()}; qs('#btnCloseParent').onclick=function(){dlgParent.close()}
+qs('#selProfile').onchange=function(){var id=this.value,p=prof(id); qs('#gradeInput').value=String(p.schoolGrade||0); qs('#overrideTime').value=p.todayOverride||''}
+qs('#gradeInput').onchange=function(){var id=qs('#selProfile').value,v=Number(this.value||'0'); if(v<0||v>6)return alert('0〜6'); prof(id).schoolGrade=v; save(); renderOne(id)}
+qs('#overrideTime').onchange=function(){var id=qs('#selProfile').value,v=this.value.trim(); prof(id).todayOverride=v||null; save(); renderOne(id)}
+qs('#pinInput').onchange=function(){state.settings.pin=this.value.trim(); save()}
+qs('#btnExport').onclick=function(){var blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='morningCoach_backup.json'; a.click()}
+qs('#fileImport').onchange=function(e){var f=e&&e.target&&e.target.files&&e.target.files[0]; if(!f)return; f.text().then(function(txt){try{state=JSON.parse(txt); save(); location.reload()}catch(err){alert('JSON形式エラー')}})}
+qs('#btnCloseTask').onclick=function(){dlgTask.close()}
 
 var taskCtx={id:'kid_6',idx:-1};
 function openTaskEditor(id,idx){
-  taskCtx={id:id,idx:idx};
-  var isNew=(idx===-1), p=prof(id), ex=p.tasks[idx]||null;
-  qs('#taskName').value=isNew?'':(ex?ex.label:'');
-  qs('#taskMin').value=isNew?'1':String(ex?ex.minutes:1);
-  qs('#taskMode').value=isNew?'tap':(ex?ex.mode:'tap');
-  dlgTask.showModal();
+  taskCtx={id:id,idx:idx}; var isNew=(idx===-1), p=prof(id), ex=p.tasks[idx]||null;
+  qs('#taskName').value=isNew?'':(ex?ex.label:''); qs('#taskMin').value=isNew?'1':String(ex?ex.minutes:1); qs('#taskMode').value=isNew?'tap':(ex?ex.mode:'tap'); dlgTask.showModal()
 }
 qs('#btnSaveTask').onclick=function(){
   var name=qs('#taskName').value.trim(); var minutes=Number(qs('#taskMin').value); var mode=qs('#taskMode').value;
-  if(!name) return alert('名前は必須'); if(!(minutes>=0.5&&minutes<=30)) return alert('0.5〜30で入力');
+  if(!name)return alert('名前は必須'); if(!(minutes>=0.5&&minutes<=30))return alert('0.5〜30で入力');
   var arr=prof(taskCtx.id).tasks;
-  if(taskCtx.idx===-1){ arr.push({id:'t_'+Date.now(),label:name,minutes:minutes,mode:mode}); }
-  else{ var tgt=arr[taskCtx.idx]; tgt.label=name; tgt.minutes=minutes; tgt.mode=mode; }
-  save(); renderOne(taskCtx.id); dlgTask.close();
-};
-qs('#btnDelTask').onclick=function(){
-  if(taskCtx.idx===-1){ dlgTask.close(); return; }
-  var arr=prof(taskCtx.id).tasks; arr.splice(taskCtx.idx,1); save(); renderOne(taskCtx.id); dlgTask.close();
-};
+  if(taskCtx.idx===-1){arr.push({id:'t_'+Date.now(),label:name,minutes:minutes,mode:mode})}
+  else{var tgt=arr[taskCtx.idx]; tgt.label=name; tgt.minutes=minutes; tgt.mode=mode}
+  save(); renderOne(taskCtx.id); dlgTask.close()
+}
+qs('#btnDelTask').onclick=function(){if(taskCtx.idx===-1){dlgTask.close();return} var arr=prof(taskCtx.id).tasks; arr.splice(taskCtx.idx,1); save(); renderOne(taskCtx.id); dlgTask.close()}
 
-/* ===== 9) （ローカル file:// ではSWは無効。公開後に有効化予定） ===== */
+/* ==== 11) 毎秒更新 ==== */
+function tick(){ ['kid_6','kid_3'].forEach(function(id){var p=prof(id); var changed=tickTimer(p,id); var area=qs(id==='kid_6'?'#tarea_k6':'#tarea_k3'); if(p.timer) area.innerHTML='<span class="timer">のこり '+mmss(p.timer.remain)+'</span>'; if(changed) renderOne(id) }) }
+setInterval(function(){renderAll();tick()},1000); renderAll();
 </script>
 </body>
 </html>
