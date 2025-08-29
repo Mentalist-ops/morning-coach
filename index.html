@@ -221,6 +221,11 @@
     </div>
 
     <div class="field">
+      <label>学年（0=未就学, 1〜6）</label>
+      <input id="gradeInput" type="number" min="0" max="6" step="1" placeholder="例: 1">
+    </div>
+
+    <div class="field">
       <label>親PIN（4桁。空なら無効）</label>
       <input id="parentPinInput" inputmode="numeric" maxlength="4" placeholder="1234">
     </div>
@@ -336,12 +341,12 @@ function todayStr(){
  * データ層
  **********************/
 /** @typedef {{id:string,label:string,minutes:number,icon:string,mode:'tap'|'timer'}} Task */
-/** @typedef {{name:string,age:number,targetDeparture:string,byWeekday:Record<string,string>,todayOverride:string|null,tasks:Task[], simpleMode:boolean, stars:number}} Profile */
+/** @typedef {{name:string,age:number,targetDeparture:string,byWeekday:Record<string,string>,todayOverride:string|null,tasks:Task[], simpleMode:boolean, stars:number, schoolGrade?:number}} Profile */
 /** @typedef {{profiles:Record<string,Profile>, settings:{ttsRate:number,ttsPitch:number,ttsVolume:number,dualMode:'auto'|'tabs'|'split', parentPin?:string}, stats:{stampsByDate:Record<string,Record<string,boolean>>}} State */
 
 const defaultState = /** @type {State} */({
   profiles:{
-    kid_6:{ name:'6歳', age:6, targetDeparture:'07:55',
+    kid_6:{ name:'6歳', age:6, schoolGrade:1, targetDeparture:'07:55',
       byWeekday:{Mon:'07:55',Tue:'07:55',Wed:'07:55',Thu:'07:55',Fri:'07:55',Sat:'09:00',Sun:'09:00'},
       todayOverride:null,
       tasks:[
@@ -357,7 +362,7 @@ const defaultState = /** @type {State} */({
       ],
       simpleMode:false, stars:0
     },
-    kid_3:{ name:'3歳', age:3, targetDeparture:'09:00',
+    kid_3:{ name:'3歳', age:3, schoolGrade:0, targetDeparture:'09:00',
       byWeekday:{Mon:'09:00',Tue:'09:00',Wed:'09:00',Thu:'09:00',Fri:'09:00',Sat:'09:30',Sun:'09:30'},
       todayOverride:null,
       tasks:[
@@ -386,7 +391,11 @@ function loadState(){
     const raw = localStorage.getItem(STORAGE_KEY);
     if(!raw){ localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultState)); return structuredClone(defaultState); }
     const s = JSON.parse(raw);
-    return {...structuredClone(defaultState), ...s};
+    // 既存ユーザーに schoolGrade が無い場合のゆるい推定（3歳→0 / 6歳→1）
+    for(const id of Object.keys(defaultState.profiles)){
+      s.profiles[id] = {...defaultState.profiles[id], ...(s.profiles?.[id]||{})};
+    }
+    return s;
   }catch(e){
     console.warn('state parse failed, reset', e);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultState));
@@ -396,10 +405,76 @@ function loadState(){
 function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 
 /**********************
+ * 学年別：漢字→かな自動変換（文科省配当基準に準拠）
+ **********************/
+function profileGrade(p){
+  if(typeof p.schoolGrade === 'number') return p.schoolGrade;
+  if(p.age<=3) return 0;            // 未就学＝全部かな
+  if(p.age<=6) return 1;            // 6歳は小1相当
+  return Math.min(6, Math.max(1, p.age-5));
+}
+
+// 小学校配当学年（抜粋） 99=小学校未習
+const KANJI_GRADE = {
+  '朝':2,'歳':99,'小':1,'学':1,'生':1,'遅':99,'分':2,'起':3,'床':99,'所':3,'要':4,
+  '時':2,'間':2,'同':2,'顔':2,'洗':6,'歯':3,'着':3,'替':99,'持':3,'物':3,'片':6,'付':4,
+  '出':1,'発':3,'準':5,'備':5
+};
+
+// 語（フレーズ）単位の読み（自然な言い換え）
+const PHRASE_READINGS = {
+  '出発準備':'でかけるじゅんび',
+  '起床':'おきる',
+  '所要':'じかん',
+  '同時':'いっしょ',
+  '遅れ':'おくれ',
+  '着替え':'きがえ',
+  '持ち物':'もちもの',
+  '片付け':'かたづけ',
+  '朝':'あさ',
+  '時間':'じかん',
+  '洗う':'あらう',
+  '顔':'かお',
+  '歯':'は',
+  '小学生':'しょうがくせい'
+};
+
+// 文字単位の読み（保険）
+const CHAR_READINGS = {
+  '朝':'あさ','歳':'さい','遅':'おく','分':'ふん','起':'お','床':'ゆか','所':'ところ',
+  '要':'よう','時':'じ','間':'ま','同':'おなじ','顔':'かお','洗':'あら','歯':'は',
+  '着':'き','替':'か','持':'も','物':'もの','片':'かた','付':'つ','出':'で','発':'はつ',
+  '準':'じゅん','備':'び'
+};
+function charGrade(ch){ return KANJI_GRADE[ch] ?? 99; }
+function isKanji(ch){ return /[\u4E00-\u9FFF]/.test(ch); }
+
+/** 学年に応じて、未修の漢字をかなに置換する */
+function toKanaByGrade(text, grade){
+  if(grade<=0) grade = 0; // 未就学＝全部かな
+  let out = text;
+
+  // 1) フレーズ置換（語単位）
+  for(const [phrase, yomi] of Object.entries(PHRASE_READINGS)){
+    if(out.includes(phrase)){
+      const hasTooHard = [...phrase].some(ch=> isKanji(ch) && charGrade(ch)>grade);
+      if(hasTooHard || grade===0){ out = out.split(phrase).join(yomi); }
+    }
+  }
+  // 2) 文字単位（残った漢字を個別に）
+  out = [...out].map(ch=>{
+    if(isKanji(ch) && (charGrade(ch)>grade || grade===0)){
+      return CHAR_READINGS[ch] ?? ch;
+    }
+    return ch;
+  }).join('');
+  return out;
+}
+
+/**********************
  * 音声（TTS/ASR）
  **********************/
 let voiceJA = null;
-/** @param {string} text */
 function speak(text){
   const u = new SpeechSynthesisUtterance(text);
   if(voiceJA) u.voice = voiceJA;
@@ -454,7 +529,6 @@ qsa('.tab').forEach(tab=>{
     qs(`#panel_${target}`).style.display='block';
   });
 });
-// 初期：iPhone想定でkid_6のみ表示（iPadはCSSで両方表示）
 qs('#panel_kid_3').style.display='none';
 
 function profileOf(id){ return state.profiles[id]; }
@@ -466,21 +540,32 @@ function remainingMinutes(p){
   const dep = hhmmToMin(effectiveDeparture(p));
   return dep - nowMin;
 }
+
 function renderProfile(id){
   const p = profileOf(id);
+  const grade = profileGrade(p);
+
+  // 見出し（年齢表記）
+  const title = p.age<=3 ? '3さい（ほいくえん）' : p.age<=6 ? '6さい（しょうがくせい）' : `${p.age}さい`;
+  qs(id==='kid_6' ? '#h_kid6' : '#h_kid3').textContent = title;
+
+  // 出発ラベル（やさしい語に）
+  const depWord = toKanaByGrade('出発', grade).replace('出発','でるじかん');
+  const depTime = effectiveDeparture(p);
+  const departEl = qs(`#depart_${id}`);
+  departEl.innerHTML = `${depWord} <strong>${depTime}</strong>（長押しで編集）`;
+
   // 残り時間
   const rem = remainingMinutes(p);
   const remainEl = qs(`#remain_${id}`);
-  const departEl = qs(`#depart_${id}`);
-  remainEl.textContent = rem>=0 ? `${String(Math.floor(rem/60)).padStart(2,'0')}:${String(Math.abs(rem%60)).padStart(2,'0')}` : `遅れ ${Math.abs(rem)}分`;
-  departEl.querySelector('strong').textContent = effectiveDeparture(p);
+  remainEl.textContent = rem>=0 ? `${String(Math.floor(rem/60)).padStart(2,'0')}:${String(Math.abs(rem%60)).padStart(2,'0')}` : toKanaByGrade(`遅れ ${Math.abs(rem)}分`, grade);
 
-  // 現在タスク（先頭未完）
+  // 現在タスク／次タスク
   const nowTask = p.tasks[0];
-  qs(`#now_${id}`).textContent = nowTask ? nowTask.label : 'すべて完了！';
-  qs(`#meta_${id}`).textContent = nowTask ? `所要 ${nowTask.minutes}分 / モード:${nowTask.mode==='timer'?'タイマー':'タップ'}` : '';
-  // 次タスク
-  qs(`#next_${id}`).textContent = p.tasks[1] ? `つぎ：「${p.tasks[1].label}」 / ${p.tasks[1].minutes}分` : 'つぎ：—';
+  qs(`#now_${id}`).textContent = nowTask ? toKanaByGrade(nowTask.label, grade) : toKanaByGrade('すべて完了！', grade);
+  qs(`#meta_${id}`).textContent = nowTask ? toKanaByGrade(`所要 ${nowTask.minutes}分 / モード:${nowTask.mode==='timer'?'タイマー':'タップ'}`, grade) : '';
+  qs(`#next_${id}`).textContent = p.tasks[1] ? toKanaByGrade(`つぎ：「${p.tasks[1].label}」 / ${p.tasks[1].minutes}分`, grade) : toKanaByGrade('つぎ：—', grade);
+
   // スター
   qs(`#stars_${id}`).textContent = `⭐${p.stars|0}`;
 
@@ -496,8 +581,8 @@ function renderProfile(id){
       <div class="drag" aria-grabbed="false" title="ドラッグで並べ替え">↕</div>
       <div style="font-size:20px">${iconEmoji(t.icon)}</div>
       <div style="flex:1">
-        <div><strong>${t.label}</strong></div>
-        <div class="taskmeta">${t.minutes}分 / ${t.mode==='timer'?'タイマー':'タップ'}</div>
+        <div><strong>${toKanaByGrade(t.label, grade)}</strong></div>
+        <div class="taskmeta">${toKanaByGrade(`${t.minutes}分 / ${t.mode==='timer'?'タイマー':'タップ'}`, grade)}</div>
       </div>
       <button class="btn ghost" data-edit-one="${idx}">編集</button>
     `;
@@ -514,7 +599,7 @@ function setupDnD(listEl, profileId){
   let dragIdx=null;
   listEl.addEventListener('dragstart', (e)=>{ const t=e.target; if(!(t instanceof HTMLElement)) return; dragIdx=Number(t.dataset.index); t.style.opacity='.6'; });
   listEl.addEventListener('dragend', (e)=>{ const t=e.target; if(!(t instanceof HTMLElement)) return; t.style.opacity='1'; });
-  listEl.addEventListener('dragover', (e)=>{ e.preventDefault(); const after = (e.target.closest('.taskitem')); if(!after) return; });
+  listEl.addEventListener('dragover', (e)=>{ e.preventDefault(); });
   listEl.addEventListener('drop', (e)=>{
     e.preventDefault();
     const after = /** @type {HTMLElement|null} */(e.target.closest('.taskitem'));
@@ -553,14 +638,14 @@ qsa('.controls').forEach(box=>{
     const cmd = btn.dataset.cmd; const id = btn.dataset.profile;
     if(!cmd || !id) return;
     const p = profileOf(id);
+    const grade = profileGrade(p);
+
     if(cmd==='begin'){
       playJingle(); // 初回タップ後の音出し（iOS解禁）
-      speak(`おはよう！${p.name}ちゃん、きょうの気分は？ ワクワク・ねむい・ふつう からえらんでね。`);
-      // ASR or フォールバック
+      speak(toKanaByGrade('おはよう！きょうの気分は？ ワクワク・ねむい・ふつう からえらんでね。', grade));
       startMoodASR((txt)=>{
         if(!txt){
-          // フォールバック選択肢を音声で促す
-          speak('画面のボタンから気分をえらんでね。');
+          speak(toKanaByGrade('画面のボタンから気分をえらんでね。', grade));
           showMoodChoices(id);
         }else{
           handleMood(id, txt);
@@ -575,65 +660,68 @@ qsa('.controls').forEach(box=>{
 });
 
 function showMoodChoices(id){
-  const p=profileOf(id);
-  const msg = `きぶんはどう？`; window.alert(msg + '\n\n（フォールバックUI：このあと最初のタスクへ進みます）');
+  window.alert('きぶんはどう？\n\n（フォールバックUI：このあと最初のタスクへ進みます）');
 }
 function handleMood(id, text){
   const t = text.replace(/\s/g,'');
-  if(t.includes('ワクワク')) speak('ワクワク、いいね！ じゃあ、トイレからいってみよう！');
-  else if(t.includes('ねむい')) speak('ねむいよね。まずはお水を一口のんで、トイレにいこう！');
-  else speak('その気持ち、だいじ。いっしょに少しずつ進もう！ まずはトイレから！');
+  if(t.includes('ワクワク')||t.includes('わくわく')) speak('わくわく、いいね！ じゃあ、トイレからいってみよう！');
+  else if(t.includes('ねむい')) speak('ねむいよね。まずはおみずをひとくちのんで、トイレにいこう！');
+  else speak('そのきもち、だいじ。いっしょにすこしずつすすもう！ まずはトイレから！');
 }
 
 function completeCurrent(id){
   const p = profileOf(id);
+  const grade = profileGrade(p);
   if(p.tasks.length===0) return;
   const t = p.tasks.shift();
   p.stars = (p.stars|0)+1;
-  // バッジ/スタンプ
   const d = todayStr();
   state.stats.stampsByDate[d] = state.stats.stampsByDate[d]||{};
   state.stats.stampsByDate[d][id] = true;
 
-  speak(`「${t.label}」できた！ すばらしい！ つぎは「${p.tasks[0]?.label||'おしまい'}」だよ。`);
+  speak(toKanaByGrade(`「${t.label}」できた！ すばらしい！ つぎは「${p.tasks[0]?.label||'おしまい'}」だよ。`, grade));
   saveState(); renderProfile(id);
-  if(p.tasks.length===0) speak('きょうのミッション、ぜんぶクリア！ ごほうびカードをゲット！');
+  if(p.tasks.length===0) speak(toKanaByGrade('きょうのミッション、ぜんぶクリア！ ごほうびカードをゲット！', grade));
 }
 
 function showHint(id){
-  const t = profileOf(id).tasks[0];
+  const p=profileOf(id);
+  const grade = profileGrade(p);
+  const t = p.tasks[0];
   const hints = {
     'トイレ':'おへや→トイレ→てをあらう、のじゅんばんだよ。',
     '顔を洗う':'ぬるまゆでそっとね。タオルでやさしくふこう！',
     '顔を拭く':'ぬれタオルでおでこ・ほっぺ・あごの順に。',
     '歯みがき':'うえ・した・うら。30びょうタイマー！',
-    '着替え':'トップス→ボトムス→くつしたの順でOK！',
+    '着替え':'トップス→ボトムス→くつした の じゅんばん！',
     '靴下':'かかとマークをあわせよう！',
     '持ち物チェック':'れんらくちょう・ハンカチ・ティッシュ！',
-    '朝ごはん':'よくかんで食べよう。',
+    '朝ごはん':'よくかんでたべよう。',
     '片付け':'おさらをシンクへ、テーブルふきふき。',
     '出発準備':'ぼうし・マスク・くつ、よし！'
   };
-  speak(hints[t?.label] || 'ゆっくりでだいじょうぶ、いっしょにやろう！');
+  const msg = hints[t?.label] || 'ゆっくりでだいじょうぶ、いっしょにやろう！';
+  speak(toKanaByGrade(msg, grade));
 }
 
 function skipCurrent(id){
   const p = profileOf(id);
+  const grade = profileGrade(p);
   if(p.tasks.length===0) return;
   const t = p.tasks.shift();
-  speak(`「${t.label}」はきょうはスキップ。 つぎは「${p.tasks[0]?.label||'おしまい'}」！`);
+  speak(toKanaByGrade(`「${t.label}」はきょうはスキップ。 つぎは「${p.tasks[0]?.label||'おしまい'}」！`, grade));
   saveState(); renderProfile(id);
 }
 
 function toggleSimple(id){
   const p = profileOf(id);
+  const grade = profileGrade(p);
   p.simpleMode = !p.simpleMode;
   if(p.simpleMode){
-    // 重要タスクだけ残す簡易化（例）
     p.tasks = p.tasks.filter(x=>['起床','トイレ','顔を洗う','顔を拭く','歯みがき','出発準備','着替え','靴下'].includes(x.label));
-    speak('カンタン版に切り替えたよ。たいせつなタスクだけにしたよ。');
+    speak(toKanaByGrade('かんたん版に切り替えたよ。たいせつなタスクだけにしたよ。', grade));
   }else{
-    speak('ふつう版にもどしたよ。');
+    speak(toKanaByGrade('ふつう版にもどしたよ。', grade));
   }
   saveState(); renderProfile(id);
 }
@@ -729,7 +817,7 @@ const dlgParent = /** @type {HTMLDialogElement} */(qs('#dlgParent'));
 qs('#btnParent').addEventListener('click', ()=>{ guardParent(()=>dlgParent.showModal()); });
 qs('#parentProfileSel').addEventListener('change', e=>{
   const id = /** @type {HTMLSelectElement} */(e.target).value;
-  // 表示更新
+  qs('#gradeInput').value = String(profileOf(id).schoolGrade ?? '');
   renderProfile(id);
 });
 qsa('[data-qtime]').forEach(ch=>ch.addEventListener('click',()=>{
@@ -767,6 +855,17 @@ qs('#importFile').addEventListener('change', async (e)=>{
 qs('#btnCacheUpdate').addEventListener('click', async ()=>{
   await navigator.serviceWorker?.getRegistration()?.then(r=>r?.update());
   alert('キャッシュ更新をリクエストしました。再読み込みしてください。');
+});
+qs('#btnParent').addEventListener('click', ()=>{
+  const id = /** @type {HTMLSelectElement} */(qs('#parentProfileSel')).value || 'kid_6';
+  qs('#gradeInput').value = String(profileOf(id).schoolGrade ?? '');
+});
+qs('#gradeInput').addEventListener('change', (e)=>{
+  const id = /** @type {HTMLSelectElement} */(qs('#parentProfileSel')).value;
+  const g = Number(/** @type {HTMLInputElement} */(e.target).value);
+  if(isNaN(g) || g<0 || g>6){ alert('0〜6で入力してください'); return; }
+  state.profiles[id].schoolGrade = g;
+  saveState(); renderProfile(id);
 });
 
 /**********************
@@ -807,11 +906,12 @@ function exportAll(){
  **********************/
 function maybeSuggest(id){
   const p = profileOf(id);
+  const grade = profileGrade(p);
   const rem = remainingMinutes(p);
   const need = p.tasks.reduce((s,t)=>s+t.minutes,0);
   if(need>rem && p.tasks.length>=2){
-    const pair = `${p.tasks[0].label} と ${p.tasks[1].label}`;
-    qs(`#next_${id}`).textContent = `時間が少ないよ。${pair} を同時にやってみる？`;
+    const pair = `${toKanaByGrade(p.tasks[0].label, grade)} と ${toKanaByGrade(p.tasks[1].label, grade)}`;
+    qs(`#next_${id}`).textContent = `じかんが すくないよ。${pair} を いっしょに やってみる？`;
   }
 }
 
