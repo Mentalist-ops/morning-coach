@@ -1,0 +1,858 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>あさのじゅんびコーチ</title>
+  <!-- iOS A2HS重視 -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <!-- 最低限のapple-touch-icon（差し替え可） -->
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/icons/apple-touch-180.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0ea5e9">
+
+  <style>
+    :root{
+      --bg:#f7fafc; --fg:#0f172a; --muted:#475569; --brand:#0ea5e9; --ok:#16a34a; --warn:#f59e0b; --danger:#ef4444;
+      --card:#ffffff; --shadow:0 6px 20px rgba(2,6,23,0.07);
+      --tap:56px; --radius:18px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family: ui-rounded, system-ui, -apple-system, "SF Pro Rounded", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif;
+      color:var(--fg); background:var(--bg);
+    }
+    header{
+      position:sticky; top:0; z-index:10; backdrop-filter:saturate(1.2) blur(6px);
+      background:linear-gradient(180deg, rgba(247,250,252,.9), rgba(247,250,252,.6));
+      border-bottom:1px solid #e5e7eb;
+    }
+    .bar{
+      max-width:1200px; margin:0 auto; padding:12px 16px; display:flex; align-items:center; gap:12px;
+    }
+    .brand{ font-weight:800; letter-spacing:.02em;}
+    .spacer{flex:1}
+    .pill{padding:8px 12px; border-radius:999px; background:#e2f2fb; color:#0369a1; font-weight:700}
+    .btn{cursor:pointer; padding:12px 16px; border-radius:12px; border:none; background:var(--brand); color:#fff; font-weight:800; box-shadow:var(--shadow); min-height:var(--tap)}
+    .btn.ghost{background:#e2f2fb; color:#0369a1}
+    .btn.warn{background:var(--warn)}
+    .btn.ok{background:var(--ok)}
+    .btn.danger{background:var(--danger)}
+    .tabs{display:flex; gap:8px; padding:8px 16px}
+    .tab{flex:1; text-align:center; padding:10px 12px; border-radius:999px; background:#e2e8f0; font-weight:700; cursor:pointer}
+    .tab.active{background:var(--brand); color:#fff}
+
+    main{max-width:1200px; margin:8px auto 80px; padding:12px}
+    .grid{
+      display:grid; gap:16px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 1024px){
+      .grid.split{grid-template-columns: 1fr 1fr;}
+    }
+    .card{
+      background:var(--card); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); min-height:280px;
+    }
+    .headline{display:flex; align-items:center; gap:12px}
+    .timebox{
+      display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;
+    }
+    .remain{font-size:36px; font-weight:900}
+    .depart{font-size:14px; color:var(--muted)}
+    .depart strong{font-size:18px; color:var(--fg)}
+    .hint{font-size:13px; color:var(--muted)}
+    .nowtask{
+      margin-top:12px; display:flex; gap:12px; align-items:center;
+    }
+    .nowtask .icon{width:56px; height:56px; border-radius:16px; background:#e2f2fb; display:grid; place-items:center}
+    .nowtask h3{margin:0; font-size:22px}
+    .controls{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap}
+    .next{margin-top:8px; font-size:14px; color:var(--muted)}
+    .row{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+    .stars{margin-left:auto; font-weight:800; color:#f59e0b}
+    .editbar{display:flex; gap:8px; align-items:center}
+    .editlink{cursor:pointer; color:#0369a1; text-decoration:underline}
+    .list{margin-top:10px; padding:8px; border-radius:12px; background:#f1f5f9; min-height:80px}
+    .taskitem{
+      display:flex; align-items:center; gap:10px; background:#fff; border-radius:12px; padding:10px; margin:6px 0; box-shadow:var(--shadow);
+    }
+    .drag{cursor:grab; opacity:.8}
+    .taskmeta{font-size:13px; color:var(--muted)}
+    .footerbar{
+      position:fixed; left:0; right:0; bottom:0; background:rgba(247,250,252,.9); backdrop-filter:blur(6px);
+      border-top:1px solid #e5e7eb; padding:12px 16px; display:flex; gap:8px; align-items:center; justify-content:center;
+    }
+    dialog{border:none; border-radius:16px; box-shadow:var(--shadow); max-width:680px; width:96%}
+    dialog::backdrop{background:rgba(2,6,23,.3)}
+    .field{display:flex; flex-direction:column; gap:6px; margin:8px 0}
+    input, select{
+      padding:12px 14px; border-radius:12px; border:1px solid #d1d5db; font-size:16px; min-height:48px;
+      background:#fff;
+    }
+    .chips{display:flex; gap:8px; flex-wrap:wrap}
+    .chip{padding:8px 10px; border-radius:999px; background:#e2e8f0; cursor:pointer}
+    .chip.active{background:#0ea5e9; color:#fff}
+    .sr-only{position:absolute; left:-10000px; width:1px; height:1px; overflow:hidden}
+  </style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand">🌅 朝のじゅんびコーチ</div>
+    <div id="modePill" class="pill">iPhone:タブ / iPad:分割</div>
+    <div class="spacer"></div>
+    <button id="btnParent" class="btn ghost" aria-label="親ダッシュボード">親ダッシュボード</button>
+  </div>
+  <!-- iPhone用タブ（小画面時のみ有効） -->
+  <div id="tabs" class="tabs" role="tablist" aria-label="プロフィール切替">
+    <div class="tab active" data-target="kid_6" role="tab" aria-selected="true">6歳</div>
+    <div class="tab" data-target="kid_3" role="tab" aria-selected="false">3歳</div>
+  </div>
+</header>
+
+<main>
+  <section id="home" class="grid split">
+    <!-- 6歳パネル -->
+    <article id="panel_kid_6" class="card" aria-labelledby="h_kid6">
+      <div class="headline">
+        <h2 id="h_kid6">6歳（小学生）</h2>
+        <div class="stars" id="stars_kid_6">⭐0</div>
+      </div>
+      <div class="timebox">
+        <div class="remain" id="remain_kid_6">--:--</div>
+        <div class="depart" id="depart_kid_6" title="長押しで編集">
+          出発 <strong>07:55</strong>（長押しで編集）
+        </div>
+      </div>
+      <div class="hint">はじめは「はじめる」をタップしてね（音声ガイドがはじまるよ）</div>
+      <div class="nowtask">
+        <div class="icon" aria-hidden="true"><svg width="28" height="28"><use href="#i-sun"/></svg></div>
+        <div>
+          <h3 id="now_kid_6">起床</h3>
+          <div class="taskmeta" id="meta_kid_6">所要 1分 / モード:タップ</div>
+        </div>
+      </div>
+      <div class="controls">
+        <button class="btn ok" data-cmd="done" data-profile="kid_6">できた！</button>
+        <button class="btn ghost" data-cmd="hint" data-profile="kid_6">わからない</button>
+        <button class="btn warn" data-cmd="skip" data-profile="kid_6">スキップ（親）</button>
+        <button class="btn" data-cmd="begin" data-profile="kid_6">はじめる</button>
+        <button class="btn ghost" data-cmd="simple" data-profile="kid_6">カンタン版</button>
+      </div>
+      <div class="next" id="next_kid_6">つぎ：—</div>
+
+      <div class="editbar" style="margin-top:10px">
+        <span class="editlink" data-edit="tasks" data-profile="kid_6">タスクを編集する</span>
+        <span class="editlink" data-edit="export" data-profile="kid_6">データをエクスポート</span>
+        <span class="editlink" data-edit="import" data-profile="kid_6">インポート</span>
+      </div>
+
+      <div class="list" id="list_kid_6" aria-label="タスク並べ替えリスト"></div>
+    </article>
+
+    <!-- 3歳パネル -->
+    <article id="panel_kid_3" class="card" aria-labelledby="h_kid3">
+      <div class="headline">
+        <h2 id="h_kid3">3歳（保育園）</h2>
+        <div class="stars" id="stars_kid_3">⭐0</div>
+      </div>
+      <div class="timebox">
+        <div class="remain" id="remain_kid_3">--:--</div>
+        <div class="depart" id="depart_kid_3" title="長押しで編集">
+          出発 <strong>09:00</strong>（長押しで編集）
+        </div>
+      </div>
+      <div class="hint">「はじめる」で音声ガイドを開始</div>
+      <div class="nowtask">
+        <div class="icon" aria-hidden="true"><svg width="28" height="28"><use href="#i-sun"/></svg></div>
+        <div>
+          <h3 id="now_kid_3">起床</h3>
+          <div class="taskmeta" id="meta_kid_3">所要 1分 / モード:タップ</div>
+        </div>
+      </div>
+      <div class="controls">
+        <button class="btn ok" data-cmd="done" data-profile="kid_3">できた！</button>
+        <button class="btn ghost" data-cmd="hint" data-profile="kid_3">わからない</button>
+        <button class="btn warn" data-cmd="skip" data-profile="kid_3">スキップ（親）</button>
+        <button class="btn" data-cmd="begin" data-profile="kid_3">はじめる</button>
+        <button class="btn ghost" data-cmd="simple" data-profile="kid_3">カンタン版</button>
+      </div>
+      <div class="next" id="next_kid_3">つぎ：—</div>
+
+      <div class="editbar" style="margin-top:10px">
+        <span class="editlink" data-edit="tasks" data-profile="kid_3">タスクを編集する</span>
+        <span class="editlink" data-edit="export" data-profile="kid_3">データをエクスポート</span>
+        <span class="editlink" data-edit="import" data-profile="kid_3">インポート</span>
+      </div>
+
+      <div class="list" id="list_kid_3" aria-label="タスク並べ替えリスト"></div>
+    </article>
+  </section>
+</main>
+
+<!-- モーダル：親ダッシュボード -->
+<dialog id="dlgParent">
+  <form method="dialog">
+    <h3>親ダッシュボード</h3>
+    <div class="field">
+      <label>対象プロフィール</label>
+      <select id="parentProfileSel">
+        <option value="kid_6">6歳（小学生）</option>
+        <option value="kid_3">3歳（保育園）</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>クイック出発時刻</label>
+      <div class="chips">
+        <span class="chip" data-qtime="07:30">07:30</span>
+        <span class="chip" data-qtime="07:55">07:55</span>
+        <span class="chip" data-qtime="08:30">08:30</span>
+        <span class="chip" data-qtime="09:00">09:00</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>曜日別（例：Mon=月） / 本日一時変更</label>
+      <div><input id="byWeekdayInput" placeholder='{"Mon":"07:55",...}'></div>
+      <div><input id="todayOverrideInput" placeholder="本日だけ例: 08:10"></div>
+    </div>
+
+    <div class="field">
+      <label>親PIN（4桁。空なら無効）</label>
+      <input id="parentPinInput" inputmode="numeric" maxlength="4" placeholder="1234">
+    </div>
+
+    <div class="field">
+      <label>JSON エクスポート / インポート</label>
+      <div class="row">
+        <button id="btnExportAll" class="btn ghost" type="button">エクスポート（全体）</button>
+        <input id="importFile" type="file" accept="application/json" />
+      </div>
+    </div>
+
+    <div class="row" style="justify-content:flex-end; gap:8px; margin-top:12px">
+      <button id="btnCacheUpdate" class="btn warn" type="button">キャッシュ更新</button>
+      <button class="btn">とじる</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- モーダル：タスク追加/編集 -->
+<dialog id="dlgTask">
+  <form method="dialog">
+    <h3>タスクの追加/編集</h3>
+    <div class="field"><label>名前（必須）</label><input id="taskName" required></div>
+    <div class="field"><label>所要分（0.5〜30の範囲）</label><input id="taskMinutes" type="number" min="0.5" max="30" step="0.5" value="1"></div>
+    <div class="field">
+      <label>チェック方式</label>
+      <select id="taskMode">
+        <option value="tap">タップ</option>
+        <option value="timer">タイマー</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>アイコン</label>
+      <div class="chips" id="iconPicker">
+        <span class="chip active" data-icon="sun">🌞</span>
+        <span class="chip" data-icon="toilet">🚻</span>
+        <span class="chip" data-icon="wash">🧼</span>
+        <span class="chip" data-icon="tooth">🪥</span>
+        <span class="chip" data-icon="dress">👗</span>
+        <span class="chip" data-icon="bag">🎒</span>
+        <span class="chip" data-icon="rice">🍚</span>
+        <span class="chip" data-icon="clean">🧹</span>
+        <span class="chip" data-icon="run">🏃</span>
+        <span class="chip" data-icon="star">⭐</span>
+      </div>
+    </div>
+    <div class="row" style="justify-content:flex-end; gap:8px; margin-top:12px">
+      <button id="btnDeleteTask" class="btn danger" type="button">削除</button>
+      <button id="btnSaveTask" class="btn ok" type="button">保存</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- モーダル：時刻編集 -->
+<dialog id="dlgTime">
+  <form method="dialog">
+    <h3>出発時刻の編集</h3>
+    <div class="chips" id="quickTimes">
+      <span class="chip" data-time="07:30">07:30</span>
+      <span class="chip" data-time="07:55">07:55</span>
+      <span class="chip" data-time="08:30">08:30</span>
+      <span class="chip" data-time="09:00">09:00</span>
+    </div>
+    <div class="field"><label>カスタム</label><input id="customTime" placeholder="HH:MM 例 08:10"></div>
+    <div class="row" style="justify-content:flex-end; gap:8px; margin-top:12px">
+      <button class="btn">とじる</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- SVG Sprites（UIピクト） -->
+<svg xmlns="http://www.w3.org/2000/svg" class="sr-only">
+  <symbol id="i-sun" viewBox="0 0 24 24"><path d="M12 4V2m0 20v-2m8-8h2M2 12h2m13.657-6.343 1.414-1.414M6.929 19.071l-1.414 1.414M17.071 19.071l1.414 1.414M4.515 4.515l1.414 1.414"/><circle cx="12" cy="12" r="5"/></symbol>
+</svg>
+
+<script type="module">
+// @ts-check
+
+/**********************
+ * 定数・ユーティリティ
+ **********************/
+const STORAGE_KEY = 'morningCoach.v1';
+const CACHE_BUST = 'v1';
+const MAX_TASKS = 50;
+const MIN_MINUTES = 0.5;
+const MAX_MINUTES = 30;
+
+const qs = (sel, root=document) => /** @type {HTMLElement} */(root.querySelector(sel));
+const qsa = (sel, root=document) => /** @type {NodeListOf<HTMLElement>} */(root.querySelectorAll(sel));
+
+/** 文字列"HH:MM"→分 */
+function hhmmToMin(hhmm){const [h,m]=hhmm.split(':').map(Number);return h*60+m}
+/** 分→"HH:MM"（0詰め） */
+function minToHHMM(min){min=((min%1440)+1440)%1440;const h=Math.floor(min/60),m=min%60;return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`}
+/** 現地（Asia/Tokyo）の曜日キー */
+function weekdayKey(){
+  const now=new Date();
+  const tz='Asia/Tokyo';
+  const s = new Intl.DateTimeFormat('en-GB',{timeZone:tz,weekday:'short'}).format(now); // Mon/Tue...
+  return {Mon:'Mon',Tue:'Tue',Wed:'Wed',Thu:'Thu',Fri:'Fri',Sat:'Sat',Sun:'Sun'}[s]||'Mon';
+}
+/** 今日のYYYY-MM-DD（東京） */
+function todayStr(){
+  const tz='Asia/Tokyo'; const now=new Date();
+  const y=new Intl.DateTimeFormat('en-CA',{timeZone:tz,year:'numeric'}).format(now);
+  const m=new Intl.DateTimeFormat('en-CA',{timeZone:tz,month:'2-digit'}).format(now);
+  const d=new Intl.DateTimeFormat('en-CA',{timeZone:tz,day:'2-digit'}).format(now);
+  return `${y}-${m}-${d}`;
+}
+
+/**********************
+ * データ層
+ **********************/
+/** @typedef {{id:string,label:string,minutes:number,icon:string,mode:'tap'|'timer'}} Task */
+/** @typedef {{name:string,age:number,targetDeparture:string,byWeekday:Record<string,string>,todayOverride:string|null,tasks:Task[], simpleMode:boolean, stars:number}} Profile */
+/** @typedef {{profiles:Record<string,Profile>, settings:{ttsRate:number,ttsPitch:number,ttsVolume:number,dualMode:'auto'|'tabs'|'split', parentPin?:string}, stats:{stampsByDate:Record<string,Record<string,boolean>>}} State */
+
+const defaultState = /** @type {State} */({
+  profiles:{
+    kid_6:{ name:'6歳', age:6, targetDeparture:'07:55',
+      byWeekday:{Mon:'07:55',Tue:'07:55',Wed:'07:55',Thu:'07:55',Fri:'07:55',Sat:'09:00',Sun:'09:00'},
+      todayOverride:null,
+      tasks:[
+        {id:'wake',label:'起床',minutes:1,icon:'sun',mode:'tap'},
+        {id:'toilet',label:'トイレ',minutes:3,icon:'toilet',mode:'timer'},
+        {id:'wash',label:'顔を洗う',minutes:2,icon:'wash',mode:'tap'},
+        {id:'tooth',label:'歯みがき',minutes:2,icon:'tooth',mode:'timer'},
+        {id:'dress',label:'着替え',minutes:3,icon:'dress',mode:'tap'},
+        {id:'bag',label:'持ち物チェック',minutes:2,icon:'bag',mode:'tap'},
+        {id:'rice',label:'朝ごはん',minutes:10,icon:'rice',mode:'timer'},
+        {id:'clean',label:'片付け',minutes:2,icon:'clean',mode:'tap'},
+        {id:'run',label:'出発準備',minutes:1,icon:'run',mode:'tap'},
+      ],
+      simpleMode:false, stars:0
+    },
+    kid_3:{ name:'3歳', age:3, targetDeparture:'09:00',
+      byWeekday:{Mon:'09:00',Tue:'09:00',Wed:'09:00',Thu:'09:00',Fri:'09:00',Sat:'09:30',Sun:'09:30'},
+      todayOverride:null,
+      tasks:[
+        {id:'wake',label:'起床',minutes:1,icon:'sun',mode:'tap'},
+        {id:'toilet_assist',label:'トイレ（補助）',minutes:4,icon:'toilet',mode:'timer'},
+        {id:'wipe_face',label:'顔を拭く',minutes:2,icon:'wash',mode:'tap'},
+        {id:'tooth',label:'歯みがき（補助）',minutes:2,icon:'tooth',mode:'timer'},
+        {id:'dress',label:'着替え',minutes:3,icon:'dress',mode:'tap'},
+        {id:'socks',label:'靴下',minutes:1,icon:'dress',mode:'tap'},
+        {id:'rice',label:'朝ごはん',minutes:12,icon:'rice',mode:'timer'},
+        {id:'clean',label:'片付け',minutes:2,icon:'clean',mode:'tap'},
+        {id:'run',label:'出発準備',minutes:1,icon:'run',mode:'tap'},
+        {id:'custom_x',label:'（親が追加）',minutes:5,icon:'star',mode:'tap'},
+      ],
+      simpleMode:false, stars:0
+    }
+  },
+  settings:{ ttsRate:1.0, ttsPitch:1.0, ttsVolume:1.0, dualMode:'auto', parentPin:'' },
+  stats:{ stampsByDate:{} }
+});
+
+let state = loadState();
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw){ localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultState)); return structuredClone(defaultState); }
+    const s = JSON.parse(raw);
+    return {...structuredClone(defaultState), ...s};
+  }catch(e){
+    console.warn('state parse failed, reset', e);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultState));
+    return structuredClone(defaultState);
+  }
+}
+function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+/**********************
+ * 音声（TTS/ASR）
+ **********************/
+let voiceJA = null;
+/** @param {string} text */
+function speak(text){
+  const u = new SpeechSynthesisUtterance(text);
+  if(voiceJA) u.voice = voiceJA;
+  u.lang = 'ja-JP';
+  u.rate = state.settings.ttsRate;
+  u.pitch = state.settings.ttsPitch;
+  u.volume = state.settings.ttsVolume;
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(u);
+}
+function pickJapaneseVoice(){
+  const voices = speechSynthesis.getVoices();
+  voiceJA = voices.find(v=>/ja-JP/i.test(v.lang)) || voices.find(v=>/ja/i.test(v.lang)) || null;
+}
+speechSynthesis.addEventListener('voiceschanged', pickJapaneseVoice);
+pickJapaneseVoice();
+
+// ASR（webkitSpeechRecognition）存在チェック
+const hasASR = typeof window !== 'undefined' && 'webkitSpeechRecognition' in window;
+function startMoodASR(onResult){
+  if(!hasASR){ onResult(null); return; }
+  const rec = new window.webkitSpeechRecognition();
+  rec.lang='ja-JP'; rec.interimResults=false; rec.maxAlternatives=1;
+  rec.onresult = (ev)=>{
+    const t = ev.results[0][0].transcript.trim();
+    onResult(t);
+  };
+  rec.onerror = ()=>onResult(null);
+  rec.start();
+}
+
+/**********************
+ * UI描画・イベント
+ **********************/
+const tabs = qs('#tabs');
+const grid = qs('#home');
+function applyDualMode(){
+  const isSplit = (state.settings.dualMode==='split') || (state.settings.dualMode==='auto' && window.innerWidth>=1024);
+  grid.classList.toggle('split', isSplit);
+  tabs.style.display = isSplit ? 'none' : 'flex';
+  qs('#modePill').textContent = isSplit ? 'iPad:分割表示' : 'iPhone:タブ切替';
+}
+applyDualMode();
+window.addEventListener('resize', applyDualMode);
+
+qsa('.tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    qsa('.tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    const target = tab.dataset.target;
+    qsa('article[id^="panel_"]').forEach(p=>p.style.display='none');
+    qs(`#panel_${target}`).style.display='block';
+  });
+});
+// 初期：iPhone想定でkid_6のみ表示（iPadはCSSで両方表示）
+qs('#panel_kid_3').style.display='none';
+
+function profileOf(id){ return state.profiles[id]; }
+function effectiveDeparture(p){
+  return p.todayOverride || p.byWeekday[weekdayKey()] || p.targetDeparture;
+}
+function remainingMinutes(p){
+  const nowMin = hhmmToMin(new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date()));
+  const dep = hhmmToMin(effectiveDeparture(p));
+  return dep - nowMin;
+}
+function renderProfile(id){
+  const p = profileOf(id);
+  // 残り時間
+  const rem = remainingMinutes(p);
+  const remainEl = qs(`#remain_${id}`);
+  const departEl = qs(`#depart_${id}`);
+  remainEl.textContent = rem>=0 ? `${String(Math.floor(rem/60)).padStart(2,'0')}:${String(Math.abs(rem%60)).padStart(2,'0')}` : `遅れ ${Math.abs(rem)}分`;
+  departEl.querySelector('strong').textContent = effectiveDeparture(p);
+
+  // 現在タスク（先頭未完）
+  const nowTask = p.tasks[0];
+  qs(`#now_${id}`).textContent = nowTask ? nowTask.label : 'すべて完了！';
+  qs(`#meta_${id}`).textContent = nowTask ? `所要 ${nowTask.minutes}分 / モード:${nowTask.mode==='timer'?'タイマー':'タップ'}` : '';
+  // 次タスク
+  qs(`#next_${id}`).textContent = p.tasks[1] ? `つぎ：「${p.tasks[1].label}」 / ${p.tasks[1].minutes}分` : 'つぎ：—';
+  // スター
+  qs(`#stars_${id}`).textContent = `⭐${p.stars|0}`;
+
+  // 並べ替えリスト
+  const list = qs(`#list_${id}`);
+  list.innerHTML = '';
+  p.tasks.forEach((t, idx)=>{
+    const item = document.createElement('div');
+    item.className='taskitem';
+    item.draggable=true;
+    item.dataset.index=String(idx);
+    item.innerHTML = `
+      <div class="drag" aria-grabbed="false" title="ドラッグで並べ替え">↕</div>
+      <div style="font-size:20px">${iconEmoji(t.icon)}</div>
+      <div style="flex:1">
+        <div><strong>${t.label}</strong></div>
+        <div class="taskmeta">${t.minutes}分 / ${t.mode==='timer'?'タイマー':'タップ'}</div>
+      </div>
+      <button class="btn ghost" data-edit-one="${idx}">編集</button>
+    `;
+    list.appendChild(item);
+  });
+  setupDnD(list, id);
+}
+
+function iconEmoji(name){
+  return {sun:'🌞',toilet:'🚻',wash:'🧼',tooth:'🪥',dress:'👗',bag:'🎒',rice:'🍚',clean:'🧹',run:'🏃',star:'⭐'}[name] || '⭐';
+}
+
+function setupDnD(listEl, profileId){
+  let dragIdx=null;
+  listEl.addEventListener('dragstart', (e)=>{ const t=e.target; if(!(t instanceof HTMLElement)) return; dragIdx=Number(t.dataset.index); t.style.opacity='.6'; });
+  listEl.addEventListener('dragend', (e)=>{ const t=e.target; if(!(t instanceof HTMLElement)) return; t.style.opacity='1'; });
+  listEl.addEventListener('dragover', (e)=>{ e.preventDefault(); const after = (e.target.closest('.taskitem')); if(!after) return; });
+  listEl.addEventListener('drop', (e)=>{
+    e.preventDefault();
+    const after = /** @type {HTMLElement|null} */(e.target.closest('.taskitem'));
+    if(after==null || dragIdx==null) return;
+    const dropIdx = Number(after.dataset.index);
+    if(dropIdx===dragIdx) return;
+    const arr = profileOf(profileId).tasks;
+    const [m]=arr.splice(dragIdx,1); arr.splice(dropIdx,0,m);
+    saveState(); renderProfile(profileId);
+  });
+
+  // 個別編集ボタン
+  listEl.addEventListener('click',(e)=>{
+    const btn = e.target;
+    if(!(btn instanceof HTMLElement)) return;
+    const idx = btn.dataset.editOne;
+    if(idx!=null){ openTaskEditor(profileId, Number(idx)); }
+  });
+}
+
+// イベント：長押しで時刻編集
+['kid_6','kid_3'].forEach(id=>{
+  const el = qs(`#depart_${id}`);
+  let timer=null;
+  el.addEventListener('touchstart', ()=>{ timer=setTimeout(()=>openTimeEditor(id), 500); }, {passive:true});
+  el.addEventListener('touchend', ()=>{ clearTimeout(timer); });
+  el.addEventListener('mousedown', ()=>{ timer=setTimeout(()=>openTimeEditor(id), 500); });
+  el.addEventListener('mouseup', ()=>{ clearTimeout(timer); });
+});
+
+// コントロール群
+qsa('.controls').forEach(box=>{
+  box.addEventListener('click',(e)=>{
+    const btn = e.target;
+    if(!(btn instanceof HTMLElement)) return;
+    const cmd = btn.dataset.cmd; const id = btn.dataset.profile;
+    if(!cmd || !id) return;
+    const p = profileOf(id);
+    if(cmd==='begin'){
+      playJingle(); // 初回タップ後の音出し（iOS解禁）
+      speak(`おはよう！${p.name}ちゃん、きょうの気分は？ ワクワク・ねむい・ふつう からえらんでね。`);
+      // ASR or フォールバック
+      startMoodASR((txt)=>{
+        if(!txt){
+          // フォールバック選択肢を音声で促す
+          speak('画面のボタンから気分をえらんでね。');
+          showMoodChoices(id);
+        }else{
+          handleMood(id, txt);
+        }
+      });
+    }
+    if(cmd==='done'){ completeCurrent(id); }
+    if(cmd==='hint'){ showHint(id); }
+    if(cmd==='skip'){ guardParent(()=>skipCurrent(id)); }
+    if(cmd==='simple'){ toggleSimple(id); }
+  });
+});
+
+function showMoodChoices(id){
+  const p=profileOf(id);
+  const msg = `きぶんはどう？`; window.alert(msg + '\n\n（フォールバックUI：このあと最初のタスクへ進みます）');
+}
+function handleMood(id, text){
+  const t = text.replace(/\s/g,'');
+  if(t.includes('ワクワク')) speak('ワクワク、いいね！ じゃあ、トイレからいってみよう！');
+  else if(t.includes('ねむい')) speak('ねむいよね。まずはお水を一口のんで、トイレにいこう！');
+  else speak('その気持ち、だいじ。いっしょに少しずつ進もう！ まずはトイレから！');
+}
+
+function completeCurrent(id){
+  const p = profileOf(id);
+  if(p.tasks.length===0) return;
+  const t = p.tasks.shift();
+  p.stars = (p.stars|0)+1;
+  // バッジ/スタンプ
+  const d = todayStr();
+  state.stats.stampsByDate[d] = state.stats.stampsByDate[d]||{};
+  state.stats.stampsByDate[d][id] = true;
+
+  speak(`「${t.label}」できた！ すばらしい！ つぎは「${p.tasks[0]?.label||'おしまい'}」だよ。`);
+  saveState(); renderProfile(id);
+  if(p.tasks.length===0) speak('きょうのミッション、ぜんぶクリア！ ごほうびカードをゲット！');
+}
+
+function showHint(id){
+  const t = profileOf(id).tasks[0];
+  const hints = {
+    'トイレ':'おへや→トイレ→てをあらう、のじゅんばんだよ。',
+    '顔を洗う':'ぬるまゆでそっとね。タオルでやさしくふこう！',
+    '顔を拭く':'ぬれタオルでおでこ・ほっぺ・あごの順に。',
+    '歯みがき':'うえ・した・うら。30びょうタイマー！',
+    '着替え':'トップス→ボトムス→くつしたの順でOK！',
+    '靴下':'かかとマークをあわせよう！',
+    '持ち物チェック':'れんらくちょう・ハンカチ・ティッシュ！',
+    '朝ごはん':'よくかんで食べよう。',
+    '片付け':'おさらをシンクへ、テーブルふきふき。',
+    '出発準備':'ぼうし・マスク・くつ、よし！'
+  };
+  speak(hints[t?.label] || 'ゆっくりでだいじょうぶ、いっしょにやろう！');
+}
+
+function skipCurrent(id){
+  const p = profileOf(id);
+  if(p.tasks.length===0) return;
+  const t = p.tasks.shift();
+  speak(`「${t.label}」はきょうはスキップ。 つぎは「${p.tasks[0]?.label||'おしまい'}」！`);
+  saveState(); renderProfile(id);
+}
+
+function toggleSimple(id){
+  const p = profileOf(id);
+  p.simpleMode = !p.simpleMode;
+  if(p.simpleMode){
+    // 重要タスクだけ残す簡易化（例）
+    p.tasks = p.tasks.filter(x=>['起床','トイレ','顔を洗う','顔を拭く','歯みがき','出発準備','着替え','靴下'].includes(x.label));
+    speak('カンタン版に切り替えたよ。たいせつなタスクだけにしたよ。');
+  }else{
+    speak('ふつう版にもどしたよ。');
+  }
+  saveState(); renderProfile(id);
+}
+
+// 親ガード
+function guardParent(fn){
+  const pin=state.settings.parentPin||'';
+  if(!pin){ fn(); return; }
+  const input = prompt('親PINを入力してください（4桁）');
+  if(input===pin) fn(); else alert('PINがちがいます');
+}
+
+/**********************
+ * タスク編集/追加
+ **********************/
+const dlgTask = /** @type {HTMLDialogElement} */(qs('#dlgTask'));
+let currentTaskCtx = {profileId:'kid_6', index:-1};
+function openTaskEditor(profileId, index=-1){
+  currentTaskCtx={profileId, index};
+  const isNew = index===-1;
+  qs('#taskName').value = isNew ? '' : profileOf(profileId).tasks[index].label;
+  qs('#taskMinutes').value = isNew ? '1' : String(profileOf(profileId).tasks[index].minutes);
+  qs('#taskMode').value = isNew ? 'tap' : profileOf(profileId).tasks[index].mode;
+  qsa('#iconPicker .chip').forEach(c=>c.classList.remove('active'));
+  const icon = isNew ? 'sun' : profileOf(profileId).tasks[index].icon;
+  const chip = qs(`#iconPicker .chip[data-icon="${icon}"]`); chip.classList.add('active');
+  dlgTask.showModal();
+}
+qsa('.editlink').forEach(a=>{
+  a.addEventListener('click', (e)=>{
+    const el = /** @type {HTMLElement} */(e.currentTarget);
+    const profileId = el.dataset.profile;
+    if(el.dataset.edit==='tasks'){ guardParent(()=>openTaskEditor(profileId,-1)); }
+    if(el.dataset.edit==='export'){ exportProfile(profileId); }
+    if(el.dataset.edit==='import'){ importProfile(profileId); }
+  });
+});
+qs('#btnSaveTask').addEventListener('click', ()=>{
+  const name = qs('#taskName').value.trim();
+  const minutes = Number(qs('#taskMinutes').value);
+  const mode = /** @type {'tap'|'timer'} */(qs('#taskMode').value);
+  const icon = /** @type {HTMLElement} */(qs('#iconPicker .chip.active')).dataset.icon;
+  if(!name){ alert('名前は必須です'); return; }
+  if(!(minutes>=MIN_MINUTES && minutes<=MAX_MINUTES)){ alert('所要は0.5〜30分'); return; }
+  const arr = profileOf(currentTaskCtx.profileId).tasks;
+  if(currentTaskCtx.index===-1){
+    if(arr.length>=MAX_TASKS){alert('タスクは最大50件です'); return;}
+    arr.push({id:`t_${Date.now()}`,label:name,minutes,icon,mode});
+  }else{
+    Object.assign(arr[currentTaskCtx.index], {label:name,minutes,icon,mode});
+  }
+  saveState(); renderProfile(currentTaskCtx.profileId); dlgTask.close();
+});
+qs('#btnDeleteTask').addEventListener('click', ()=>{
+  if(currentTaskCtx.index===-1){ dlgTask.close(); return; }
+  const arr = profileOf(currentTaskCtx.profileId).tasks;
+  arr.splice(currentTaskCtx.index,1);
+  saveState(); renderProfile(currentTaskCtx.profileId); dlgTask.close();
+});
+qsa('#iconPicker .chip').forEach(c=>c.addEventListener('click',()=>{
+  qsa('#iconPicker .chip').forEach(x=>x.classList.remove('active'));
+  c.classList.add('active');
+}));
+
+/**********************
+ * 時刻編集（長押し）
+ **********************/
+const dlgTime = /** @type {HTMLDialogElement} */(qs('#dlgTime'));
+let timeEditTarget = 'kid_6';
+function openTimeEditor(profileId){
+  timeEditTarget = profileId;
+  dlgTime.showModal();
+}
+qsa('#quickTimes .chip').forEach(c=>c.addEventListener('click',()=>{
+  const t = c.dataset.time; applyTimeEdit(t);
+}));
+qs('#customTime').addEventListener('change', (e)=>{
+  const t = /** @type {HTMLInputElement} */(e.target).value.trim();
+  if(!/^\d{2}:\d{2}$/.test(t)) { alert('HH:MM形式で入力ください'); return; }
+  applyTimeEdit(t);
+});
+function applyTimeEdit(t){
+  const p = profileOf(timeEditTarget);
+  p.todayOverride = t;
+  speak(`きょうだけ出発時刻を ${t} にしたよ。`);
+  saveState(); renderProfile(timeEditTarget); dlgTime.close();
+}
+
+/**********************
+ * 親ダッシュボード
+ **********************/
+const dlgParent = /** @type {HTMLDialogElement} */(qs('#dlgParent'));
+qs('#btnParent').addEventListener('click', ()=>{ guardParent(()=>dlgParent.showModal()); });
+qs('#parentProfileSel').addEventListener('change', e=>{
+  const id = /** @type {HTMLSelectElement} */(e.target).value;
+  // 表示更新
+  renderProfile(id);
+});
+qsa('[data-qtime]').forEach(ch=>ch.addEventListener('click',()=>{
+  const t = ch.dataset.qtime;
+  const id = /** @type {HTMLSelectElement} */(qs('#parentProfileSel')).value;
+  const p = profileOf(id);
+  p.todayOverride = t;
+  saveState(); renderProfile(id);
+}));
+qs('#byWeekdayInput').addEventListener('change',(e)=>{
+  const id = /** @type {HTMLSelectElement} */(qs('#parentProfileSel')).value;
+  try{
+    const obj = JSON.parse(/** @type {HTMLInputElement} */(e.target).value);
+    state.profiles[id].byWeekday = obj; saveState(); renderProfile(id);
+  }catch{ alert('JSONの形式が不正です'); }
+});
+qs('#todayOverrideInput').addEventListener('change',(e)=>{
+  const id = /** @type {HTMLSelectElement} */(qs('#parentProfileSel')).value;
+  const v = /** @type {HTMLInputElement} */(e.target).value.trim();
+  state.profiles[id].todayOverride = v || null; saveState(); renderProfile(id);
+});
+qs('#parentPinInput').addEventListener('change',(e)=>{
+  state.settings.parentPin = /** @type {HTMLInputElement} */(e.target).value.trim();
+  saveState();
+});
+qs('#btnExportAll').addEventListener('click', exportAll);
+qs('#importFile').addEventListener('change', async (e)=>{
+  const file = /** @type {HTMLInputElement} */(e.target).files?.[0]; if(!file) return;
+  const text = await file.text();
+  try{
+    const obj = JSON.parse(text);
+    state = obj; saveState(); location.reload();
+  }catch{ alert('JSONの形式が不正です'); }
+});
+qs('#btnCacheUpdate').addEventListener('click', async ()=>{
+  await navigator.serviceWorker?.getRegistration()?.then(r=>r?.update());
+  alert('キャッシュ更新をリクエストしました。再読み込みしてください。');
+});
+
+/**********************
+ * エクスポート/インポート（プロフィール単位）
+ **********************/
+function exportProfile(id){
+  const data = { [id]: state.profiles[id] };
+  const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `morningCoach_${id}_${todayStr()}.json`;
+  a.click();
+}
+function importProfile(id){
+  const input = document.createElement('input');
+  input.type='file'; input.accept='application/json';
+  input.onchange = async ()=>{
+    const file = input.files?.[0]; if(!file) return;
+    const text = await file.text();
+    try{
+      const obj = JSON.parse(text);
+      if(obj[id]){ state.profiles[id]=obj[id]; saveState(); renderProfile(id); }
+      else alert('指定プロフィールのデータが見つかりません');
+    }catch{ alert('JSONの形式が不正です'); }
+  };
+  input.click();
+}
+function exportAll(){
+  const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `morningCoach_all_${todayStr()}.json`;
+  a.click();
+}
+
+/**********************
+ * 軽量リプラン提案
+ **********************/
+function maybeSuggest(id){
+  const p = profileOf(id);
+  const rem = remainingMinutes(p);
+  const need = p.tasks.reduce((s,t)=>s+t.minutes,0);
+  if(need>rem && p.tasks.length>=2){
+    const pair = `${p.tasks[0].label} と ${p.tasks[1].label}`;
+    qs(`#next_${id}`).textContent = `時間が少ないよ。${pair} を同時にやってみる？`;
+  }
+}
+
+/**********************
+ * ジングル（WebAudio生成）
+ **********************/
+let audioCtx=null;
+function playJingle(){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    const ctx=audioCtx; const o=ctx.createOscillator(); const g=ctx.createGain();
+    o.type='triangle'; o.frequency.value=660; g.gain.value=.0001;
+    o.connect(g).connect(ctx.destination); o.start();
+    const now=ctx.currentTime;
+    g.gain.exponentialRampToValueAtTime(0.2, now+.02);
+    o.frequency.exponentialRampToValueAtTime(990, now+.25);
+    g.gain.exponentialRampToValueAtTime(0.0001, now+.35);
+    o.stop(now+.4);
+  }catch{}
+}
+
+/**********************
+ * Service Worker登録
+ **********************/
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('./service-worker.js?'+CACHE_BUST).catch(()=>{});
+  });
+}
+
+/**********************
+ * 毎秒更新
+ **********************/
+function tick(){
+  ['kid_6','kid_3'].forEach(id=>{
+    renderProfile(id);
+    maybeSuggest(id);
+  });
+}
+setInterval(tick, 1000);
+tick(); // 初期表示
+</script>
+</body>
+</html>
